@@ -1,12 +1,83 @@
-<div id="player-box">
-    <h2>{{ title }}</h2>
-    <p style="color: #666;">{{ artist }}</p>
-
-    <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem;">
-        <button hx-post="/cmd/prev" hx-swap="none">Prev</button>
-        <button hx-post="/cmd/toggle" hx-swap="none">
-            {% if is_playing %}Pause{% else %}Play{% endif %}
-        </button>
-        <button hx-post="/cmd/next" hx-swap="none">Next</button>
+<div id="player-box" style="display:grid; gap:1rem;">
+    {% if has_connection_error %}
+    <div style="background: rgba(218,54,51,0.18); border: 1px solid #da3633; border-radius: 10px; padding: 0.75rem;">
+        {{ connection_error_message }}
     </div>
+    {% endif %}
+
+    <section style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:1rem;">
+        {% if has_cover %}
+        <div style="margin-bottom:0.8rem;">
+            <img
+                src="/cover/current?k={{ cover_cache_key }}"
+                alt="Album cover"
+                style="display:block; width:100%; max-width:320px; aspect-ratio:1/1; object-fit:cover; border-radius:10px; border:1px solid #30363d; margin:0 auto;"
+            >
+        </div>
+        {% endif %}
+        <h2 style="margin:0 0 0.35rem 0;">{{ title }}</h2>
+        <div style="color:#8b949e;">{{ artist }} · {{ album }}</div>
+
+        <div style="margin-top:0.8rem; height:8px; background:#0d1117; border-radius:100px; overflow:hidden;">
+            <div style="width: {{ progress_percent }}%; height:100%; background:#2f81f7;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; color:#8b949e; font-size:0.9rem; margin-top:0.4rem;">
+            <span>{{ elapsed_label }}</span>
+            <span>{{ duration_label }}</span>
+        </div>
+    </section>
+
+    <section style="display:grid; gap:0.7rem;">
+        <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+            <button hx-post="/cmd/prev" hx-swap="none">⏮</button>
+            <button hx-post="/cmd/toggle" hx-swap="none">
+                {% if is_playing %}⏸ Pause{% else %}▶ Play{% endif %}
+            </button>
+            <button hx-post="/cmd/next" hx-swap="none">⏭</button>
+            <button hx-post="/cmd/stop" hx-swap="none">⏹ Stop</button>
+        </div>
+
+        <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+            <button hx-post="/cmd/vol-down" hx-swap="none">Vol -</button>
+            <button hx-post="/cmd/vol-up" hx-swap="none">Vol +</button>
+            <span style="padding:0.4rem 0.6rem; border:1px solid #30363d; border-radius:8px;">{{ volume }}%</span>
+        </div>
+
+        <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+            <button hx-post="/cmd/repeat" hx-swap="none" style="border-color:{% if repeat %}#238636{% else %}#30363d{% endif %};">
+                Repeat {% if repeat %}On{% else %}Off{% endif %}
+            </button>
+            <button hx-post="/cmd/random" hx-swap="none" style="border-color:{% if random %}#238636{% else %}#30363d{% endif %};">
+                Random {% if random %}On{% else %}Off{% endif %}
+            </button>
+            <button hx-post="/cmd/single" hx-swap="none" style="border-color:{% if single %}#238636{% else %}#30363d{% endif %};">
+                Single {% if single %}On{% else %}Off{% endif %}
+            </button>
+            <button hx-post="/cmd/consume" hx-swap="none" style="border-color:{% if consume %}#238636{% else %}#30363d{% endif %};">
+                Consume {% if consume %}On{% else %}Off{% endif %}
+            </button>
+        </div>
+    </section>
+
+    <section style="background:#161b22; border:1px solid #30363d; border-radius:12px; overflow:hidden;">
+        <div style="padding:0.8rem 1rem; border-bottom:1px solid #30363d; font-weight:600;">Queue</div>
+        {% if queue.is_empty() %}
+        <div style="padding:1rem; color:#8b949e;">Queue is empty.</div>
+        {% else %}
+        <div>
+            {% for item in queue %}
+            <button
+                hx-post="/cmd/play/{{ item.position }}"
+                hx-swap="none"
+                style="width:100%; text-align:left; border:0; border-bottom:1px solid #30363d; background:{% if item.is_current %}rgba(47,129,247,0.15){% else %}transparent{% endif %}; color:inherit; padding:0.75rem 1rem;">
+                <div style="display:flex; justify-content:space-between; gap:0.8rem;">
+                    <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ item.display_position }}. {{ item.title }}</span>
+                    <span style="color:#8b949e; flex-shrink:0;">{{ item.duration_label }}</span>
+                </div>
+                <div style="color:#8b949e; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ item.artist }}</div>
+            </button>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
 </div>

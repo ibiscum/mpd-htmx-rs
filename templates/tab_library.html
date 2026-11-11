@@ -1,0 +1,170 @@
+<div style="display:grid; gap:1rem;">
+    <section style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:1rem;">
+        <h3 style="margin-top:0;">Library</h3>
+        <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-bottom:0.6rem;">
+            <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                <input type="hidden" name="dir" value="">
+                <input type="hidden" name="sort" value="{{ sort_key }}">
+                <input type="hidden" name="order" value="{{ sort_order }}">
+                <input type="hidden" name="per_page" value="{{ per_page }}">
+                <input type="hidden" name="page" value="1">
+                <button type="submit">Root</button>
+            </form>
+            {% if has_parent %}
+            <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                <input type="hidden" name="dir" value="{{ parent_dir }}">
+                <input type="hidden" name="sort" value="{{ sort_key }}">
+                <input type="hidden" name="order" value="{{ sort_order }}">
+                <input type="hidden" name="per_page" value="{{ per_page }}">
+                <input type="hidden" name="page" value="1">
+                <button type="submit">Up</button>
+            </form>
+            {% endif %}
+            <span style="padding:0.4rem 0.6rem; border:1px solid #30363d; border-radius:8px; color:#8b949e;">/{{ current_dir }}</span>
+        </div>
+
+        {% if directories.is_empty() %}
+        <div style="color:#8b949e;">No subdirectories.</div>
+        {% else %}
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            {% for dir in directories %}
+            <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                <input type="hidden" name="dir" value="{{ dir.full_path }}">
+                <input type="hidden" name="sort" value="{{ sort_key }}">
+                <input type="hidden" name="order" value="{{ sort_order }}">
+                <input type="hidden" name="per_page" value="{{ per_page }}">
+                <input type="hidden" name="page" value="1">
+                <button type="submit">📁 {{ dir.name }}</button>
+            </form>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    <section style="background:#161b22; border:1px solid #30363d; border-radius:12px; overflow:hidden;">
+        <div style="padding:0.8rem 1rem; border-bottom:1px solid #30363d; display:flex; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
+            <strong>Songs</strong>
+            <span style="color:#8b949e;">{{ page_start }}-{{ page_end }} / {{ total_songs }}</span>
+        </div>
+        <div style="padding:0.65rem 1rem; border-bottom:1px solid #30363d; display:grid; gap:0.6rem;">
+            <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                    <input type="hidden" name="dir" value="{{ current_dir }}">
+                    <input type="hidden" name="sort" value="title">
+                    <input type="hidden" name="order" value="{{ title_next_order }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+                    <input type="hidden" name="page" value="1">
+                    <button type="submit">Title {{ title_indicator }}</button>
+                </form>
+                <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                    <input type="hidden" name="dir" value="{{ current_dir }}">
+                    <input type="hidden" name="sort" value="artist">
+                    <input type="hidden" name="order" value="{{ artist_next_order }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+                    <input type="hidden" name="page" value="1">
+                    <button type="submit">Artist {{ artist_indicator }}</button>
+                </form>
+                <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                    <input type="hidden" name="dir" value="{{ current_dir }}">
+                    <input type="hidden" name="sort" value="album">
+                    <input type="hidden" name="order" value="{{ album_next_order }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+                    <input type="hidden" name="page" value="1">
+                    <button type="submit">Album {{ album_indicator }}</button>
+                </form>
+                <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                    <input type="hidden" name="dir" value="{{ current_dir }}">
+                    <input type="hidden" name="sort" value="duration">
+                    <input type="hidden" name="order" value="{{ duration_next_order }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+                    <input type="hidden" name="page" value="1">
+                    <button type="submit">Duration {{ duration_indicator }}</button>
+                </form>
+            </div>
+            <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                <span style="color:#8b949e; padding:0.4rem 0.2rem;">Per page:</span>
+                <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                    <input type="hidden" name="dir" value="{{ current_dir }}">
+                    <input type="hidden" name="sort" value="{{ sort_key }}">
+                    <input type="hidden" name="order" value="{{ sort_order }}">
+                    <input type="hidden" name="per_page" value="50">
+                    <input type="hidden" name="page" value="1">
+                    <button type="submit">50</button>
+                </form>
+                <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                    <input type="hidden" name="dir" value="{{ current_dir }}">
+                    <input type="hidden" name="sort" value="{{ sort_key }}">
+                    <input type="hidden" name="order" value="{{ sort_order }}">
+                    <input type="hidden" name="per_page" value="100">
+                    <input type="hidden" name="page" value="1">
+                    <button type="submit">100</button>
+                </form>
+                <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                    <input type="hidden" name="dir" value="{{ current_dir }}">
+                    <input type="hidden" name="sort" value="{{ sort_key }}">
+                    <input type="hidden" name="order" value="{{ sort_order }}">
+                    <input type="hidden" name="per_page" value="200">
+                    <input type="hidden" name="page" value="1">
+                    <button type="submit">200</button>
+                </form>
+            </div>
+        </div>
+        {% if songs.is_empty() %}
+        <div style="padding:1rem; color:#8b949e;">No songs in this directory.</div>
+        {% else %}
+        <div>
+            {% for song in songs %}
+            <div style="padding:0.8rem 1rem; border-bottom:1px solid #30363d;">
+                <div style="display:flex; justify-content:space-between; gap:0.8rem;">
+                    <div style="min-width:0;">
+                        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ song.title }}</div>
+                        <div style="color:#8b949e; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ song.artist }} · {{ song.album }}</div>
+                    </div>
+                    <span style="color:#8b949e; flex-shrink:0;">{{ song.duration_label }}</span>
+                </div>
+                <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.5rem;">
+                    <form hx-post="/library/queue" hx-swap="none">
+                        <input type="hidden" name="uri" value="{{ song.uri }}">
+                        <button type="submit">Queue</button>
+                    </form>
+                    <form hx-post="/library/add-to-playlist" hx-swap="none" style="display:flex; gap:0.35rem;">
+                        <input type="hidden" name="uri" value="{{ song.uri }}">
+                        <input name="playlist" list="playlist-names" placeholder="Playlist" style="background:#0d1117; color:#e6edf3; border:1px solid #30363d; border-radius:8px; padding:0.3rem 0.5rem;">
+                        <button type="submit">Add to playlist</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div style="padding:0.8rem 1rem; border-top:1px solid #30363d; display:flex; gap:0.45rem; align-items:center; justify-content:flex-end; flex-wrap:wrap;">
+            <span style="color:#8b949e;">Page {{ page }} / {{ total_pages }}</span>
+            {% if has_prev_page %}
+            <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                <input type="hidden" name="dir" value="{{ current_dir }}">
+                <input type="hidden" name="sort" value="{{ sort_key }}">
+                <input type="hidden" name="order" value="{{ sort_order }}">
+                <input type="hidden" name="per_page" value="{{ per_page }}">
+                <input type="hidden" name="page" value="{{ prev_page }}">
+                <button type="submit">Prev</button>
+            </form>
+            {% endif %}
+            {% if has_next_page %}
+            <form hx-post="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">
+                <input type="hidden" name="dir" value="{{ current_dir }}">
+                <input type="hidden" name="sort" value="{{ sort_key }}">
+                <input type="hidden" name="order" value="{{ sort_order }}">
+                <input type="hidden" name="per_page" value="{{ per_page }}">
+                <input type="hidden" name="page" value="{{ next_page }}">
+                <button type="submit">Next</button>
+            </form>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<datalist id="playlist-names">
+    {% for name in playlists %}
+    <option value="{{ name }}">
+    {% endfor %}
+</datalist>

@@ -1,0 +1,66 @@
+<div style="display:grid; gap:1rem;">
+    <section style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:1rem;">
+        <h3 style="margin-top:0;">Playlist Management</h3>
+        <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-bottom:0.6rem;">
+            {% for playlist in playlists %}
+            <form hx-post="/tab/playlists" hx-target="#tab-content" hx-swap="innerHTML">
+                <input type="hidden" name="name" value="{{ playlist }}">
+                <button type="submit">{{ playlist }}</button>
+            </form>
+            {% endfor %}
+        </div>
+
+        <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+            <form hx-post="/playlist/save" hx-swap="none" style="display:flex; gap:0.35rem;">
+                <input name="name" placeholder="Save queue as..." style="background:#0d1117; color:#e6edf3; border:1px solid #30363d; border-radius:8px; padding:0.3rem 0.5rem;">
+                <button type="submit">Save queue</button>
+            </form>
+            {% if !selected_name.is_empty() %}
+            <form hx-post="/playlist/load" hx-swap="none">
+                <input type="hidden" name="name" value="{{ selected_name }}">
+                <button type="submit">Load (append)</button>
+            </form>
+            <form hx-post="/playlist/load" hx-swap="none">
+                <input type="hidden" name="name" value="{{ selected_name }}">
+                <input type="hidden" name="replace" value="1">
+                <button type="submit">Load (replace queue)</button>
+            </form>
+            <form hx-post="/playlist/clear" hx-swap="none">
+                <input type="hidden" name="name" value="{{ selected_name }}">
+                <button type="submit">Clear songs</button>
+            </form>
+            <form hx-post="/playlist/delete" hx-swap="none">
+                <input type="hidden" name="name" value="{{ selected_name }}">
+                <button type="submit">Delete playlist</button>
+            </form>
+            {% endif %}
+        </div>
+    </section>
+
+    <section style="background:#161b22; border:1px solid #30363d; border-radius:12px; overflow:hidden;">
+        <div style="padding:0.8rem 1rem; border-bottom:1px solid #30363d; font-weight:600;">
+            {% if selected_name.is_empty() %}Playlist songs{% else %}{{ selected_name }}{% endif %}
+        </div>
+        {% if songs.is_empty() %}
+        <div style="padding:1rem; color:#8b949e;">No songs to show.</div>
+        {% else %}
+        {% for song in songs %}
+        <div style="padding:0.8rem 1rem; border-bottom:1px solid #30363d;">
+            <div style="display:flex; justify-content:space-between; gap:0.8rem;">
+                <div style="min-width:0;">
+                    <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ song.title }}</div>
+                    <div style="color:#8b949e; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ song.artist }} · {{ song.album }}</div>
+                </div>
+                <span style="color:#8b949e; flex-shrink:0;">{{ song.duration_label }}</span>
+            </div>
+            <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.5rem;">
+                <form hx-post="/library/queue" hx-swap="none">
+                    <input type="hidden" name="uri" value="{{ song.uri }}">
+                    <button type="submit">Queue</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </section>
+</div>

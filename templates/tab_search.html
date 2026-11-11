@@ -1,0 +1,51 @@
+<div style="display:grid; gap:1rem;">
+    <section style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:1rem;">
+        <h3 style="margin-top:0;">Search</h3>
+        <form hx-get="/tab/search" hx-target="#tab-content" hx-swap="innerHTML" style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+            <input
+                type="search"
+                name="q"
+                value="{{ query }}"
+                placeholder="Search title, artist, album..."
+                style="flex:1; min-width:220px; background:#0d1117; color:#e6edf3; border:1px solid #30363d; border-radius:8px; padding:0.45rem 0.6rem;"
+            >
+            <button type="submit">Search</button>
+        </form>
+    </section>
+
+    <section style="background:#161b22; border:1px solid #30363d; border-radius:12px; overflow:hidden;">
+        <div style="padding:0.8rem 1rem; border-bottom:1px solid #30363d; font-weight:600;">Results (max 200)</div>
+        {% if results.is_empty() %}
+        <div style="padding:1rem; color:#8b949e;">No results yet.</div>
+        {% else %}
+        {% for song in results %}
+        <div style="padding:0.8rem 1rem; border-bottom:1px solid #30363d;">
+            <div style="display:flex; justify-content:space-between; gap:0.8rem;">
+                <div style="min-width:0;">
+                    <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ song.title }}</div>
+                    <div style="color:#8b949e; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ song.artist }} · {{ song.album }}</div>
+                </div>
+                <span style="color:#8b949e; flex-shrink:0;">{{ song.duration_label }}</span>
+            </div>
+            <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.5rem;">
+                <form hx-post="/library/queue" hx-swap="none">
+                    <input type="hidden" name="uri" value="{{ song.uri }}">
+                    <button type="submit">Queue</button>
+                </form>
+                <form hx-post="/library/add-to-playlist" hx-swap="none" style="display:flex; gap:0.35rem;">
+                    <input type="hidden" name="uri" value="{{ song.uri }}">
+                    <input name="playlist" list="search-playlist-names" placeholder="Playlist" style="background:#0d1117; color:#e6edf3; border:1px solid #30363d; border-radius:8px; padding:0.3rem 0.5rem;">
+                    <button type="submit">Add to playlist</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </section>
+</div>
+
+<datalist id="search-playlist-names">
+    {% for name in playlists %}
+    <option value="{{ name }}">
+    {% endfor %}
+</datalist>

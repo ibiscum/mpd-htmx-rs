@@ -461,7 +461,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mpd-htmx"
+name = "mpd-htmx-rs"
 version = "0.1.0"
 dependencies = [
  "askama",
