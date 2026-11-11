@@ -1,0 +1,12 @@
+<div id="player-box">
+    <h2>{{ title }}</h2>
+    <p style="color: #666;">{{ artist }}</p>
+
+    <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem;">
+        <button hx-post="/cmd/prev" hx-swap="none">Prev</button>
+        <button hx-post="/cmd/toggle" hx-swap="none">
+            {% if is_playing %}Pause{% else %}Play{% endif %}
+        </button>
+        <button hx-post="/cmd/next" hx-swap="none">Next</button>
+    </div>
+</div>

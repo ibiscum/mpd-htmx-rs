@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rust + htmx MPD Client</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/sse.js"></script>
+</head>
+<body style="font-family: sans-serif; max-width: 420px; margin: 4rem auto; text-align: center;">
+    <!-- Listen for 'player-update' SSE events and replace the inner HTML -->
+    <div hx-ext="sse" sse-connect="/events" sse-swap="player-update">
+        {% include "player_partial.html" %}
+    </div>
+</body>
+</html>
