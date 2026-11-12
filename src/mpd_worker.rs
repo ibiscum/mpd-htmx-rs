@@ -92,6 +92,9 @@ pub async fn start_mpd_bridge(
             eprintln!("Failed to fetch initial MPD state: {err}");
         }
 
+        let mut progress_tick = tokio::time::interval(Duration::from_secs(1));
+        progress_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
         loop {
             tokio::select! {
                 event = state_changes.next() => {
@@ -111,6 +114,13 @@ pub async fn start_mpd_bridge(
                             eprintln!("MPD connection closed; reconnecting");
                             break;
                         }
+                    }
+                }
+
+                _ = progress_tick.tick() => {
+                    if let Err(err) = push_progress_state(&client, &state_tx).await {
+                            eprintln!("Failed to refresh MPD progress: {err}");
+                            break;
                     }
                 }
 
@@ -138,6 +148,22 @@ async fn push_latest_state(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = fetch_state(client).await?;
     let _ = state_tx.send(state);
+    Ok(())
+}
+
+async fn push_progress_state(
+    client: &Client,
+    state_tx: &watch::Sender<PlayerState>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let status = client.command(commands::Status).await?;
+    let mut next = state_tx.borrow().clone();
+
+    next.is_playing = status.state == PlayState::Playing;
+    next.elapsed_secs = status.elapsed.map(|d| d.as_secs()).unwrap_or(0);
+    next.duration_secs = status.duration.map(|d| d.as_secs()).unwrap_or(0);
+    next.current_position = status.current_song.map(|(pos, _)| pos.0);
+
+    let _ = state_tx.send(next);
     Ok(())
 }
 

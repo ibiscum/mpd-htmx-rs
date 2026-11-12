@@ -4,11 +4,86 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MPD Web Client</title>
+    <link href="https://fonts.googleapis.com/css?family=Lato:400,400i,700" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/sse.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
+            let queueScrollTop = 0;
+            let queueRestoreTries = 0;
+            let activeQueueList = null;
+            let suppressQueueCapture = false;
+
+            function captureQueueScroll() {
+                const queueList = document.getElementById("queue-list");
+                if (!queueList) {
+                    return;
+                }
+                if (suppressQueueCapture) {
+                    return;
+                }
+                queueScrollTop = queueList.scrollTop;
+            }
+
+            function restoreQueueScroll() {
+                const queueList = document.getElementById("queue-list");
+                if (!queueList) {
+                    return;
+                }
+                suppressQueueCapture = true;
+                queueList.scrollTop = queueScrollTop;
+                requestAnimationFrame(() => {
+                    suppressQueueCapture = false;
+                });
+            }
+
+            function restoreQueueScrollDeferred() {
+                restoreQueueScroll();
+                queueRestoreTries += 1;
+                const queueList = document.getElementById("queue-list");
+                if (!queueList || queueRestoreTries >= 4) {
+                    queueRestoreTries = 0;
+                    return;
+                }
+                requestAnimationFrame(restoreQueueScrollDeferred);
+            }
+
+            function bindQueueScrollCapture() {
+                const queueList = document.getElementById("queue-list");
+                if (!queueList || queueList === activeQueueList) {
+                    return;
+                }
+                activeQueueList = queueList;
+                restoreQueueScrollDeferred();
+                queueList.addEventListener("scroll", () => {
+                    if (suppressQueueCapture) {
+                        return;
+                    }
+                    queueScrollTop = queueList.scrollTop;
+                });
+            }
+
+            const queueObserver = new MutationObserver(() => {
+                bindQueueScrollCapture();
+            });
+            queueObserver.observe(document.body, { childList: true, subtree: true });
+            bindQueueScrollCapture();
+            setInterval(() => {
+                if (suppressQueueCapture || queueRestoreTries > 0) {
+                    return;
+                }
+                const queueList = document.getElementById("queue-list");
+                if (!queueList) {
+                    return;
+                }
+                queueScrollTop = queueList.scrollTop;
+            }, 150);
+
             if (window.htmx) {
+                document.body.addEventListener("htmx:beforeSwap", captureQueueScroll);
+                document.body.addEventListener("htmx:afterSettle", restoreQueueScrollDeferred);
+                document.body.addEventListener("htmx:sseBeforeMessage", captureQueueScroll);
+                document.body.addEventListener("htmx:sseMessage", restoreQueueScrollDeferred);
                 return;
             }
 
@@ -21,7 +96,9 @@
                     return false;
                 }
                 if (swap === "innerHTML") {
+                    captureQueueScroll();
                     target.innerHTML = responseText;
+                    restoreQueueScroll();
                     return true;
                 }
                 return false;
@@ -79,47 +156,329 @@
     <style>
         :root {
             color-scheme: dark;
-            --bg: #0f1117;
-            --panel: #161b22;
-            --text: #e6edf3;
-            --muted: #8b949e;
-            --accent: #2f81f7;
-            --active: #238636;
+            --bg: rgba(0, 0, 0, 0.82);
+            --text: #ffffff;
+            --muted: rgba(255, 255, 255, 0.5);
+            --border: #30363e;
+            --ring: rgba(85, 181, 96, 0.34);
+            --accent: #55b560;
+            --panel: #192029;
             --danger: #da3633;
-            --border: #30363d;
+            --queue-bg: #242b33;
+            --queue-active: #30363e;
         }
         * { box-sizing: border-box; }
         body {
             margin: 0;
-            font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
+            font-family: "Lato", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
         .layout {
             max-width: 960px;
             margin: 0 auto;
-            padding: 1rem;
+            padding: 1rem 1rem 1.5rem;
+        }
+        .layout * {
+            border-radius: 0 !important;
+        }
+        input,
+        button {
+            font: inherit;
+            color: var(--text);
         }
         button {
-            background: var(--panel);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.45rem 0.7rem;
-            font: inherit;
+            background: #242b33;
+            border: 1px solid #3a424b;
+            border-radius: 0;
+            padding: 0.45rem 0.72rem;
+            transition: background 0.18s ease, border-color 0.18s ease, transform 0.05s ease, opacity 0.18s ease;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #2e3640;
+            border-color: #4a535d;
+        }
+        button:focus-visible,
+        input:focus-visible {
+            outline: 0;
+            box-shadow: 0 0 0 3px var(--ring);
         }
         button:active {
             transform: translateY(1px);
+        }
+        input {
+            background: #0c1526;
+            border: 1px solid var(--border);
+            border-radius: 0;
+            padding: 0.4rem 0.56rem;
+        }
+        .amp-tabs {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+            background: #141920;
+            border: 1px solid #20262f;
+            border-radius: 0;
+            padding: 0.5rem;
+        }
+        .amp-tab-button {
+            border-radius: 0;
+            min-width: 92px;
+            text-align: center;
+        }
+
+        #flat-black-player-container {
+            position: relative;
+            max-width: 400px;
+            margin: 0 auto;
+            border-radius: 0;
+            overflow: hidden;
+            border: 1px solid #20262f;
+        }
+        #flat-black-player-container #player-top img {
+            width: 100%;
+            height: 370px;
+            object-fit: cover;
+            display: block;
+        }
+        #flat-black-player-container #player-top .no-cover {
+            width: 100%;
+            height: 370px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #11151b;
+            color: var(--muted);
+        }
+        #flat-black-player-container #player-progress-bar-container {
+            width: 100%;
+            height: 4px;
+            background: #000;
+            position: relative;
+        }
+        #flat-black-player-container #song-played-progress {
+            height: 4px;
+            background: #fff;
+        }
+        #flat-black-player-container #player-middle {
+            background: #000;
+            text-align: center;
+            position: relative;
+            padding: 20px 15px;
+        }
+        #flat-black-player-container #time-container {
+            width: 100%;
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 3px;
+        }
+        #flat-black-player-container #time-container .elapsed {
+            position: absolute;
+            top: 0;
+            left: 5px;
+        }
+        #flat-black-player-container #time-container .duration {
+            position: absolute;
+            top: 0;
+            right: 5px;
+        }
+        #flat-black-player-container .song-name {
+            display: block;
+            font-size: 16px;
+            line-height: 24px;
+            letter-spacing: 0.5px;
+            color: #fff;
+        }
+        #flat-black-player-container .song-artist-album {
+            font-size: 14px;
+            line-height: 16px;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        #flat-black-player-container #player-bottom {
+            background: #192029;
+            padding: 0 25px 20px;
+        }
+        #flat-black-player-container #control-container {
+            height: 60px;
+            padding: 40px 0;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            align-items: center;
+        }
+        #flat-black-player-container .control-wrap {
+            text-align: center;
+        }
+        #flat-black-player-container .flat-icon-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0;
+            border: 0;
+            color: #fff;
+            background: transparent;
+            padding: 0;
+            line-height: 1;
+        }
+        #flat-black-player-container .flat-icon-button svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #flat-black-player-container .flat-icon-button.small {
+            width: 24px;
+            height: 24px;
+            opacity: 0.9;
+        }
+        #flat-black-player-container .flat-icon-button.tiny {
+            width: 18px;
+            height: 18px;
+            opacity: 0.72;
+        }
+        #flat-black-player-container .flat-icon-button.tiny.active {
+            opacity: 1;
+            color: #55b560;
+        }
+        #flat-black-player-container .flat-icon-button.large {
+            width: 60px;
+            height: 60px;
+            border: 1px solid #596470;
+            background: #242b33;
+        }
+        #flat-black-player-container #volume-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-top: 2px;
+        }
+        #flat-black-player-container .volume-label {
+            font-size: 14px;
+            opacity: 0.86;
+            width: 34px;
+        }
+        #flat-black-player-container .volume-pct {
+            font-size: 14px;
+            color: #fff;
+            opacity: 0.86;
+            min-width: 40px;
+            text-align: center;
+        }
+        #flat-black-player-container #utility-buttons {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 10px;
+        }
+        #flat-black-player-container #utility-buttons button {
+            font-size: 12px;
+            padding: 0.26rem 0.55rem;
+            border-radius: 0;
+            border-color: #3a424b;
+        }
+        #flat-black-player-container #queue-screen {
+            border-top: 1px solid #20262f;
+            background: #141920;
+        }
+        #flat-black-player-container #queue-header {
+            padding: 15px;
+            text-align: center;
+            height: 25px;
+            font-size: 14px;
+            letter-spacing: 0.45px;
+        }
+        #flat-black-player-container #queue-list .song {
+            width: 100%;
+            border: 0;
+            border-bottom: 1px solid #141920;
+            border-radius: 0;
+            background: #242b33;
+            color: inherit;
+            padding: 15px;
+            cursor: pointer;
+            text-align: left;
+        }
+        #flat-black-player-container #queue-list {
+            max-height: 315px;
+            overflow-y: auto;
+        }
+        #flat-black-player-container #queue-list .song.current {
+            background: #30363e;
+        }
+        #flat-black-player-container #queue-list .song-number-now-playing {
+            display: inline-block;
+            width: 24px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        #flat-black-player-container #queue-list .song-number-now-playing .number {
+            opacity: 0.5;
+            font-size: 14px;
+            color: #fff;
+            letter-spacing: 0.5px;
+        }
+        #flat-black-player-container #queue-list .song-number-now-playing .now-playing {
+            display: none;
+            color: #55b560;
+            font-size: 12px;
+            line-height: 1;
+        }
+        #flat-black-player-container #queue-list .song.current .song-number-now-playing .number {
+            display: none;
+        }
+        #flat-black-player-container #queue-list .song.current .song-number-now-playing .now-playing {
+            display: inline-block;
+        }
+        #flat-black-player-container #queue-list .song-meta-container {
+            display: inline-block;
+            margin-left: 8px;
+            vertical-align: middle;
+            width: calc(100% - 84px);
+        }
+        #flat-black-player-container #queue-list .song-meta-container .song-name {
+            display: block;
+            font-size: 14px;
+            line-height: 16px;
+            color: #55b560;
+            letter-spacing: 0.47px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #flat-black-player-container #queue-list .song-meta-container .song-artist {
+            font-size: 12px;
+            line-height: 14px;
+            color: #fff;
+            letter-spacing: 0.47px;
+            display: block;
+            margin-top: 2px;
+            opacity: 0.95;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #flat-black-player-container #queue-list .song-duration {
+            display: inline-block;
+            opacity: 0.5;
+            font-size: 14px;
+            color: #fff;
+            width: 35px;
+            text-align: center;
+            vertical-align: middle;
         }
     </style>
 </head>
 <body>
     <div class="layout">
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
-            <button hx-get="/tab/player" hx-target="#tab-content" hx-swap="innerHTML">Player</button>
-            <button hx-get="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">Library</button>
-            <button hx-get="/tab/playlists" hx-target="#tab-content" hx-swap="innerHTML">Playlists</button>
-            <button hx-get="/tab/search" hx-target="#tab-content" hx-swap="innerHTML">Search</button>
+        <div class="amp-tabs">
+            <button class="amp-tab-button" hx-get="/tab/player" hx-target="#tab-content" hx-swap="innerHTML">Player</button>
+            <button class="amp-tab-button" hx-get="/tab/library" hx-target="#tab-content" hx-swap="innerHTML">Library</button>
+            <button class="amp-tab-button" hx-get="/tab/playlists" hx-target="#tab-content" hx-swap="innerHTML">Playlists</button>
+            <button class="amp-tab-button" hx-get="/tab/search" hx-target="#tab-content" hx-swap="innerHTML">Search</button>
         </div>
         <div id="tab-content">
             {{ initial_tab_html|safe }}

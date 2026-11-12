@@ -19,13 +19,7 @@ use mpd_client::{
     tag::Tag,
 };
 use mpd_worker::{ClientCommand, PlayerState, QueueItem, start_mpd_bridge};
-use std::{
-    cmp::min,
-    collections::{BTreeSet, HashMap},
-    convert::Infallible,
-    env,
-    time::Duration,
-};
+use std::{cmp::min, collections::HashMap, convert::Infallible, env, time::Duration};
 use tokio::{
     net::TcpStream,
     sync::{mpsc, watch},
@@ -86,19 +80,14 @@ struct QueueItemView {
 #[derive(Template)]
 #[template(path = "tab_library.html")]
 struct TabLibraryTemplate {
-    current_dir: String,
-    has_parent: bool,
-    parent_dir: String,
     sort_key: String,
     sort_order: String,
-    title_next_order: String,
+    track_next_order: String,
     artist_next_order: String,
     album_next_order: String,
-    duration_next_order: String,
-    title_indicator: String,
+    track_indicator: String,
     artist_indicator: String,
     album_indicator: String,
-    duration_indicator: String,
     per_page: usize,
     total_songs: usize,
     page: usize,
@@ -109,15 +98,8 @@ struct TabLibraryTemplate {
     prev_page: usize,
     has_next_page: bool,
     next_page: usize,
-    directories: Vec<DirectoryView>,
     songs: Vec<SongView>,
     playlists: Vec<String>,
-}
-
-#[derive(Clone)]
-struct DirectoryView {
-    name: String,
-    full_path: String,
 }
 
 #[derive(Clone)]
@@ -126,13 +108,11 @@ struct SongView {
     title: String,
     artist: String,
     album: String,
-    duration_secs: u64,
     duration_label: String,
 }
 
 #[derive(Clone)]
 struct LibraryParams {
-    dir: String,
     sort_key: String,
     sort_order: String,
     page: usize,
@@ -177,7 +157,15 @@ async fn main() {
         mpd_addr,
     };
 
-    let app = Router::new()
+    let app = build_app(app_state);
+
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    println!("Listening on http://localhost:3000");
+    axum::serve(listener, app).await.unwrap();
+}
+
+fn build_app(app_state: AppState) -> Router {
+    Router::new()
         .route("/", get(index_handler))
         .route("/events", get(sse_handler))
         .route("/cover/current", get(current_cover_handler))
@@ -202,11 +190,7 @@ async fn main() {
         .route("/playlist/save", post(save_queue_as_playlist_handler))
         .route("/playlist/delete", post(delete_playlist_handler))
         .route("/playlist/clear", post(clear_playlist_handler))
-        .with_state(app_state);
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("Listening on http://localhost:3000");
-    axum::serve(listener, app).await.unwrap();
+        .with_state(app_state)
 }
 
 fn mpd_addr_from_env() -> Result<String, String> {
@@ -585,58 +569,26 @@ fn queue_item_to_view(item: &QueueItem, current_position: Option<usize>) -> Queu
 }
 
 async fn render_library_tab(state: &AppState, params: &LibraryParams) -> String {
-    let dir = params.dir.trim_matches('/');
     let client = match connect_mpd(&state.mpd_addr).await {
         Ok(client) => client,
         Err(err) => return format!("<div class=\"panel\">Failed to connect to MPD: {err}</div>"),
     };
 
-    let songs = match client.command(commands::ListAllIn::directory(dir)).await {
+    let songs = match client.command(commands::ListAllIn::root()).await {
         Ok(songs) => songs,
         Err(err) => return format!("<div class=\"panel\">Failed to load library: {err}</div>"),
     };
     let playlists = fetch_playlist_names(&client).await;
 
-    let mut directories = BTreeSet::new();
     let mut song_rows = Vec::new();
-    let prefix = if dir.is_empty() {
-        String::new()
-    } else {
-        format!("{dir}/")
-    };
 
     for song in songs {
-        let remainder = if dir.is_empty() {
-            song.url.as_str()
-        } else if let Some(rest) = song.url.strip_prefix(&prefix) {
-            rest
-        } else {
-            continue;
-        };
-
-        if remainder.is_empty() {
-            continue;
-        }
-
-        if let Some((child, _)) = remainder.split_once('/') {
-            directories.insert(child.to_string());
-            continue;
-        }
-
         song_rows.push(song_to_view(
             &song.url,
             &song.tags,
             song.duration.map(|d| d.as_secs()),
         ));
     }
-
-    let directories = directories
-        .into_iter()
-        .map(|name| DirectoryView {
-            full_path: join_path(dir, &name),
-            name,
-        })
-        .collect::<Vec<_>>();
 
     sort_songs(&mut song_rows, &params.sort_key, &params.sort_order);
 
@@ -653,30 +605,19 @@ async fn render_library_tab(state: &AppState, params: &LibraryParams) -> String 
         page_start_idx + 1
     };
     let page_end = page_end_idx;
-    let parent_dir = parent_dir(dir).unwrap_or_default();
-    let title_indicator = sort_indicator("title", &params.sort_key, &params.sort_order);
+    let track_indicator = sort_indicator("track", &params.sort_key, &params.sort_order);
     let artist_indicator = sort_indicator("artist", &params.sort_key, &params.sort_order);
     let album_indicator = sort_indicator("album", &params.sort_key, &params.sort_order);
-    let duration_indicator = sort_indicator("duration", &params.sort_key, &params.sort_order);
 
     TabLibraryTemplate {
-        current_dir: dir.to_string(),
-        has_parent: !dir.is_empty(),
-        parent_dir,
         sort_key: params.sort_key.clone(),
         sort_order: params.sort_order.clone(),
-        title_next_order: next_order_for_column("title", &params.sort_key, &params.sort_order),
+        track_next_order: next_order_for_column("track", &params.sort_key, &params.sort_order),
         artist_next_order: next_order_for_column("artist", &params.sort_key, &params.sort_order),
         album_next_order: next_order_for_column("album", &params.sort_key, &params.sort_order),
-        duration_next_order: next_order_for_column(
-            "duration",
-            &params.sort_key,
-            &params.sort_order,
-        ),
-        title_indicator,
+        track_indicator,
         artist_indicator,
         album_indicator,
-        duration_indicator,
         per_page: params.per_page,
         total_songs,
         page,
@@ -687,7 +628,6 @@ async fn render_library_tab(state: &AppState, params: &LibraryParams) -> String 
         prev_page: page.saturating_sub(1).max(1),
         has_next_page: page < total_pages,
         next_page: page + 1,
-        directories,
         songs,
         playlists,
     }
@@ -798,31 +738,12 @@ fn song_to_view(
         title,
         artist,
         album,
-        duration_secs: duration_secs.unwrap_or(0),
         duration_label: format_duration(duration_secs.unwrap_or(0)),
     }
 }
 
 fn file_name(uri: &str) -> String {
     uri.rsplit('/').next().unwrap_or(uri).to_string()
-}
-
-fn parent_dir(dir: &str) -> Option<String> {
-    if dir.is_empty() {
-        None
-    } else if let Some((parent, _)) = dir.rsplit_once('/') {
-        Some(parent.to_string())
-    } else {
-        Some(String::new())
-    }
-}
-
-fn join_path(base: &str, child: &str) -> String {
-    if base.is_empty() {
-        child.to_string()
-    } else {
-        format!("{base}/{child}")
-    }
 }
 
 async fn connect_mpd(addr: &str) -> Result<Client, String> {
@@ -841,14 +762,115 @@ fn format_duration(total_secs: u64) -> String {
     format!("{minutes:02}:{seconds:02}")
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{body::Body, http::Request};
+    use tower::util::ServiceExt;
+
+    fn test_song(title: &str, artist: &str, album: &str, duration_secs: u64) -> SongView {
+        SongView {
+            uri: format!("library/{title}.mp3"),
+            title: title.to_string(),
+            artist: artist.to_string(),
+            album: album.to_string(),
+            duration_label: format_duration(duration_secs),
+        }
+    }
+
+    #[test]
+    fn library_params_defaults_and_validation() {
+        let empty = HashMap::new();
+        let params = library_params_from_map(&empty);
+        assert_eq!(params.sort_key, "track");
+        assert_eq!(params.sort_order, "asc");
+        assert_eq!(params.page, 1);
+        assert_eq!(params.per_page, 100);
+
+        let mut invalid = HashMap::new();
+        invalid.insert("sort".to_string(), "wat".to_string());
+        invalid.insert("order".to_string(), "sideways".to_string());
+        invalid.insert("page".to_string(), "0".to_string());
+        invalid.insert("per_page".to_string(), "99999".to_string());
+        let params = library_params_from_map(&invalid);
+        assert_eq!(params.sort_key, "track");
+        assert_eq!(params.sort_order, "asc");
+        assert_eq!(params.page, 1);
+        assert_eq!(params.per_page, 500);
+    }
+
+    #[test]
+    fn sort_songs_by_track_desc() {
+        let mut songs = vec![
+            test_song("short", "c", "z", 30),
+            test_song("long", "a", "x", 210),
+            test_song("mid", "b", "y", 120),
+        ];
+
+        sort_songs(&mut songs, "track", "desc");
+        let titles = songs
+            .iter()
+            .map(|song| song.title.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(titles, vec!["short", "mid", "long"]);
+    }
+
+    #[tokio::test]
+    async fn command_routes_accept_valid_paths() {
+        let (state_tx, state_rx) = watch::channel(PlayerState::default());
+        drop(state_tx);
+        let (cmd_tx, mut cmd_rx) = mpsc::channel(8);
+        let app = build_app(AppState {
+            state_rx,
+            cmd_tx,
+            mpd_addr: "127.0.0.1:6600".to_string(),
+        });
+
+        let toggle_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/cmd/toggle")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(toggle_response.status(), StatusCode::NO_CONTENT);
+        assert!(matches!(
+            cmd_rx.recv().await,
+            Some(ClientCommand::TogglePlay)
+        ));
+
+        let play_response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/cmd/play/7")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(play_response.status(), StatusCode::NO_CONTENT);
+        assert!(matches!(
+            cmd_rx.recv().await,
+            Some(ClientCommand::PlayAt(7))
+        ));
+    }
+}
+
 fn library_params_from_map(values: &HashMap<String, String>) -> LibraryParams {
-    let dir = values.get("dir").cloned().unwrap_or_default();
     let mut sort_key = values
         .get("sort")
         .map(|v| v.to_lowercase())
-        .unwrap_or_else(|| "title".to_string());
-    if !matches!(sort_key.as_str(), "title" | "artist" | "album" | "duration") {
-        sort_key = "title".to_string();
+        .unwrap_or_else(|| "track".to_string());
+    if sort_key == "title" {
+        sort_key = "track".to_string();
+    }
+    if !matches!(sort_key.as_str(), "track" | "artist" | "album") {
+        sort_key = "track".to_string();
     }
 
     let mut sort_order = values
@@ -871,7 +893,6 @@ fn library_params_from_map(values: &HashMap<String, String>) -> LibraryParams {
         .unwrap_or(1);
 
     LibraryParams {
-        dir,
         sort_key,
         sort_order,
         page,
@@ -902,7 +923,6 @@ fn sort_songs(songs: &mut [SongView], sort_key: &str, sort_order: &str) {
     match sort_key {
         "artist" => songs.sort_by_key(|song| song.artist.to_lowercase()),
         "album" => songs.sort_by_key(|song| song.album.to_lowercase()),
-        "duration" => songs.sort_by_key(|song| song.duration_secs),
         _ => songs.sort_by_key(|song| song.title.to_lowercase()),
     }
     if sort_order == "desc" {

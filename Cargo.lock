@@ -471,6 +471,7 @@ dependencies = [
  "mpd_client",
  "tokio",
  "tokio-stream",
+ "tower",
 ]
 
 [[package]]

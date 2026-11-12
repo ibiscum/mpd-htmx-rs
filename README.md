@@ -13,7 +13,7 @@ This app provides:
 - Volume controls and playback option toggles (repeat/random/single/consume)
 - Cover art for current song (`/cover/current`)
 - Tabbed screens for:
-  - Library browser (directory navigation + sortable columns + pagination + queue/add-to-playlist)
+  - Library browser (flat artist/album/track columns + sorting + pagination + queue/add-to-playlist)
   - Playlist management (list/load/save/clear/delete)
   - Search tab (full-library text search)
 
